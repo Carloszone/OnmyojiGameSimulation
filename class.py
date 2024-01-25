@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class ShiShen:
+class Hero:
     def __init__(self):
         pass
 
@@ -18,7 +18,7 @@ class ShiShen:
         pass
 
 
-class Yuhun:
+class Item:
     def __init__(self, target_code):
         self.target_code = target_code
 

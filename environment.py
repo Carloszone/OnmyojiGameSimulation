@@ -1,67 +1,60 @@
 import numpy as np
 import random
 
-class Judge:
-    def __init__(self, speed, round=0, buff_ratio=0.15, debuff_ratio=0.15):
-        self.id = 0
-        self.speed = speed
-        self.process = 0
-        self.time = np.round((1000-self.process) / speed,4)
-        self.round = round
-        self.buff_factor = buff_ratio * min(10, self.round)
-        self.debuff_factor = debuff_ratio * min(10, self.round)
-
-    def action(self):
-        self.round += 1
-
-    def locate_info(self, att, n, reverse=False):
-        return [(self, self.time)]
-
-    def att_update(self, att, value):
-        setattr(self, att, )
-
-
 
 class Env:
-    def __init__(self, team1, team2, judge):
-        self.team1 = team1
-        self.team2 = team2
-        self.judge = judge
-        self.step_count = 0
+    def __init__(self):
+        pass
+        self.stage_code = 0
+        self.round_count = 0
 
-    def locate_actor(self):
-        actors = []
-        for obj in [self.judge, self.team1, self.team2]:
-            actors += obj.locate_info('time', 1)
-
-        actors = sorted(actors, key=lambda x: x[1])
-        return actors[0]
-
-    def update_process(self, actor, value):
-        for team in [self.team1.team, self.team2.team]:
-            for char in team:
-                if char.id != actor.id:
-                    char.process += np.round(min(value * char.speed + char.process, 1000), 4)
-                else:
-                    char.process = 0
-                char.time = np.round((1000 - char.process) / char.speed, 4)
-
-    def begainning_effect(self):
+    def reset(self):
         pass
 
     def step(self):
-        actor, time = self.locate_actor()
-        self.update_process(actor, time) # 更新所有对象的进度条和时间属性
+        # game start
+        if self.stage_code == 0 and self.round_count == 0:
+            speciall_call()  # 结算特殊开场事件
+            hero_call()  # 结算式神开局效果
+            Item_call()  # 结算御魂开局效果
+            hero_update()  # 英雄状态更新
+            self.stage_code = 1  # 阶段更新
 
-        if self.step_count == 0:
-            self.begainning_effect() # 开局效果
+        # round start
+        if self.stage_code == 1:
+            hero = pick_next_act_hero()  # 决定下一个行动的式神
+            hero_call()  # 结算式神回合开始前效果
+            Item_call()  # 结算御魂回合开始前效果
+            hero_update()  # 英雄状态更新
+            death_check()  # 死亡检查
+            death_call()  # 结算死亡效果
+            hero_update()  # 英雄状态更新
+            self.stage_code += 0.01  # 阶段更新
 
-        actor.action() # 执行行动
+        # action start
+        if self.stage_code == 1.01:
+            hero_call()  # 结算式神行动开始前效果
+            Item_call()  # 结算御魂行动开始前效果
+            hero_update()  # 英雄状态更新
+            death_check()  # 死亡检查
+            death_call()  # 结算死亡效果
+            hero_update()  # 英雄状态更新
+            self.stage_code += 0.01  # 阶段更新
 
-        death_flag, death_num = self.death_check() # 死亡检查
-        if death_flag:
-            self.team1.death_effect(death_num)
-            self.team2.death_effect(death_num)
+
+        # action process
+        if self.stage_code == 1.02:
+            hero.skill_pick()  # 选择，使用使用
+            skill_call()  # 结算技能和触发效果
+            hero_update()  # 英雄状态更新
+            death_check()  # 死亡检查
+            death_call()  # 结算死亡效果
+            hero_update()  # 英雄状态更新
+            self.stage_code += 0.01  # 阶段更新
+
+        # action end
+
+        # round end
 
 
 
