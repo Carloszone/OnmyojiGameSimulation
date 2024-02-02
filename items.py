@@ -1,11 +1,16 @@
 import numpy as np
-from class_collection import Hero, Item, Skill, EffectPool
-import random
+from class_collection import Hero, Item, EffectPool, Effect
+from functions import damage, heal, add_effect
 
 # Item
 class Fuyi(Item):
-    def effect(self, hero, stage_code):
-        if self.trigger(stage_code) and self.seal_check(hero) and self.change_check(change_code):
+    def __init__(self, host_code):
+        super().__init__(host_code, stage_code=None)
+
+    def trigger(self, hero, value):
+        if self.seal_check(hero):
+            heal(self.host_code, value)
+
 
 
 

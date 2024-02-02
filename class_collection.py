@@ -14,27 +14,25 @@ class Hero:
         self.effect_rate = effect_rate
         self.effect_defense = effect_defense
         self.item = item
+        self.shield = 0
         self.buffs = {}
         self.debuffs = {}
 
 
 class Item:
-    def __init__(self, target_code, change_code):
-        self.target_code = target_code
-        self.change_code = change_code
-
-    def trigger(self, stage_code):
-        return stage_code == self.target_code
+    def __init__(self, host_code, stage_code):
+        self.host_code = host_code
+        self.stage_code = stage_code
 
     def seal_check(self, hero):
         return 'seal' not in hero.debuffs.keys()
 
-    def change_check(self, change_code):
-        return change_code == self.change_code
+    def stage_check(self, stage_code):
+        return stage_code == self.stage_code
 
 
 
-class Skill:
+class Action:
     def __init__(self):
         pass
 
@@ -60,9 +58,8 @@ class EffectPool:
 
 
 class Effect:
-    def __init__(self, source, target, category, count_object=None, value=None, duration=None):
+    def __init__(self, host, source, target, category, count_object=None, value=None, duration=None):
         """
-
         :param source: 效果来源id
         :param target: 效果目标id
         :param category: 效果类型：即时效果（1伤害，2治疗），持续效果（3状态，4印记），状态可以驱散而印记不能
@@ -83,6 +80,7 @@ class Effect:
 
     # 效果
     def effect(self):
+        pass
 
     # duration更新， duration为0则效果消失
     def remove(self):
