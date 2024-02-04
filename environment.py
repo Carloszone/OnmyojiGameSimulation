@@ -11,6 +11,29 @@ class Env:
     def reset(self):
         pass
 
+    def damage_process(self):
+        # 计算伤害A
+
+        # 计算护盾
+
+        # 计算伤害B
+
+        # 计算造成伤害时效果
+
+        # 锁定分担目标
+
+        # 计算分担伤害
+
+        # 得到伤害B1
+
+        # 计算伤害B2
+
+        # 伤害B2修正
+
+        # 扣除生命
+        pass
+
+
     def step(self):
         while True:
             # game start
