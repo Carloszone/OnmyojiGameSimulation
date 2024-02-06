@@ -29,7 +29,6 @@ class Damage:
         self.factor = factor
         self.share = share
 
-
     def random_factor(self):
         upper_bound = max(self.factor)
         lower_bound = min(self.factor)
@@ -69,7 +68,6 @@ class Damage:
             # 计算护盾,得到伤害B
             damage_b_value = max(damage_a_value - target_hero.shield - target_hero.rot_blood * 3, 0)
 
-
             if damage_b_value > 0:
                 # 计算造成伤害时效果
                 ddamage_b_value = damage_b_value * self_make_damage_state_multiply * target_make_damage_state_multiply
@@ -78,9 +76,9 @@ class Damage:
                 if search_hero_info(target_hero, 'state_id', '孤立'):  # 如果有孤立状态
                     pass
                 else:
-                    if search_hero_info(source_hero, 'state_id', '椒图'):  #椒图状态
+                    if search_hero_info(source_hero, 'state_id', '椒图'):  # 椒图状态
                         share_num = len('椒图_count')
-                    if search_hero_info(source_hero.emeny_team - target_hero, 'state_id', '剃魂'): # 如果有剃魂状态
+                    if search_hero_info(source_hero.emeny_team - target_hero, 'state_id', '剃魂'):  # 如果有剃魂状态
                         damage_b_value = damage_b_value * 0.5
 
                 # 计算伤害C
@@ -106,7 +104,8 @@ class Damage:
 
 
 class Character:
-    def __init__(self, id, team, enemy_team, attack, health, defense, speed, crit, crit_damage, effect_rate, effect_defense, item, bar_length, position):
+    def __init__(self, id, team, enemy_team, attack, health, defense, speed, crit, crit_damage, effect_rate,
+                 effect_defense, item, bar_length, position):
         # 属性相关
         self.id = id
         self.team = team
@@ -149,9 +148,8 @@ class Character:
                     plus_value += state.value
         return (original_value + plus_value) * (1 + multiply_value)
 
-
     # 行动条状态更新
-    def update_action_bar(self, in_time, in_length):
+    def update_action_bar(self, in_time=None, in_length=None):
         current_speed = self.get_current_attribution('speed')
         # 拉条场景处理
         if in_time is None:  # 如果时间为空，说明是拉条场景
@@ -212,7 +210,6 @@ class State:
         self.rule = in_rule
         self.duration = in_duration
         self.count_obj = in_count_obj
-
 
     # 触发判定
     def trigger(self):

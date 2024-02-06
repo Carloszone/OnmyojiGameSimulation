@@ -23,7 +23,7 @@ class Env:
         pass
 
     def get_single_attribution_from_pool(self, in_attribution_name, standard='min'):
-        sored_attributions = sorted([getattr(character, in_attribution_name) for character in self.character_pool])
+        sored_attributions = sorted([(getattr(character, in_attribution_name), character) for character in self.character_pool])
         if standard == 'min':
             return sored_attributions[0]
         elif standard == 'max':
@@ -67,15 +67,16 @@ class Env:
         """
         pass
 
-
     def step(self):
         # 1. 游戏开始时
-        ## 1.1 统计各个角色的剩余行动条时间，找出最小时间和角色
+        # 1.1 统计各个角色的剩余行动条时间，找出最小时间和角色
+        min_time, min_character = self.get_single_attribution_from_pool(self, 'remaining_time', standard='min')  # 返回最小时间和角色
 
+        # 1.2 更新所有角色的行动条时间
+        for character in self.character_pool:
+            character.update_action_bar(in_time=min_time)
 
-        ## 1.2 更新所有角色的行动条时间
-
-        ## 1.3 执行其他游戏开始时效果
+        # 1.3 执行其他游戏开始时效果
 
         # 2. 游戏回合开始
         round_code = 0
