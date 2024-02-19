@@ -14,9 +14,9 @@ def possibility(input_rate: float):
 # 根据id查找式神对应信息
 def search_hero_info(input_hero_pool, input_obj_type, input_obj_id):
     # 调整参数的数据类型
-    if type(input_hero_pool) != list:
+    if type(input_hero_pool) is not list:
         input_hero_pool = [input_hero_pool]
-    if type(input_obj_id) == int:
+    if type(input_obj_id) is int:
         input_obj_id = [input_obj_id]
 
     # 查找对应的式神信息
