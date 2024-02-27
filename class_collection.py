@@ -6,6 +6,49 @@ import numpy as np
 from functions import possibility, search_hero_info, costume_sorted, state_check
 
 
+class Effect:
+    def __init__(self, in_source, in_target, in_value, in_type, in_damage_type=None):
+        """
+
+        :param in_source: 效果来源id
+        :param in_target: 效果对象id
+        :param in_value: 效果数值
+        :param in_type: 效果类型，1 伤害； 2 治疗； 3 恢复生命； 4 失去生命
+        :param in_damage_type: 伤害类型： 0 非暴击伤害， 1 暴击伤害， 2 间接伤害， 3 传导伤害， 4 真实伤害；
+        """
+        self.source = in_source
+        self.target = in_target
+        self.value = in_value
+        self.type = in_type
+        self.damage_type = in_damage_type
+        self.is_call = 0  # 效果是否已经结算
+
+    def call(self, hero_pool):
+        """
+        效果结算函数, 返回溢出伤害或治疗
+        :param hero_pool: 有效式神池
+        :return:
+        """
+        if self.is_call == 0:
+            target = hero_pool.search_hero(self.target)
+            if self.type == 1:
+                target.health = max(target.health - self.value, 0)
+                diff = target.health - self.value
+            elif self.type == 2:
+                target.health = min(target.health + self.value, target.max_health)
+                diff = target.health - self.value
+            elif self.type == 3:
+                target.health = min(target.health + self.value, target.max_health)
+                diff = target.health - self.value
+            elif self.type == 4:
+                target.health = max(target.health - self.value, 0)
+                diff = target.health - self.value
+            else:
+                raise ValueError(f'No such effect type! {self.type}')
+        self.is_call = 1
+        return diff
+
+
 class Character:
     def __init__(self, role_id, attack, health, defense, speed, crit, crit_damage, effect_rate,
                  effect_defense, item, position):
@@ -17,6 +60,7 @@ class Character:
         self.defense = defense
         self.speed = speed
         self.crit = crit
+        self.crit_resistance = 0
         self.crit_damage = crit_damage
         self.effect_hit = effect_rate
         self.effect_resistance = effect_defense
@@ -34,15 +78,21 @@ class Character:
         self.reach_method = None
 
         # 其他
-        self.position = position
+        self.position = position  # 式神站位次序
 
-    def get_current_attribution(self, in_attribution_name):
+    def get_current_attribution(self, in_attribution_name: str, input_hero=None, attack_type=None):
+        if input_hero is None:
+            input_hero = self
+
         # 获取原始属性值
-        original_value = getattr(self, in_attribution_name, None)
-        related_state_ids = state2attribution[in_attribution_name]  # 获取相关状态的id
+        original_value = getattr(input_hero, in_attribution_name, None)
+        if in_attribution_name == 'defense' and attack_type == 2:
+            related_state_ids = state2attribution[in_attribution_name]  # 获取相关状态的id
+        else:
+            related_state_ids = state2attribution[in_attribution_name]  # 获取相关状态的id
         multiply_value = 0
         plus_value = 0
-        for state in self.states:
+        for state in input_hero.states:
             if state.id in related_state_ids:
                 if state.category < 10:
                     multiply_value += state.value
@@ -51,7 +101,7 @@ class Character:
         return (original_value + plus_value) * (1 + multiply_value)
 
     # 行动条状态更新
-    def update_action_bar(self, in_time=None, in_length=None):
+    def update_action_point(self, in_time=None, in_length=None):
         current_speed = self.get_current_attribution('speed')
         # 拉条场景处理
         if in_time is None:  # 如果时间为空，说明是拉条场景
@@ -70,80 +120,154 @@ class Character:
             else:
                 self.remaining_length = self.remaining_time * current_speed
 
-    def random_factor(self):
-        return np.random.uniform(0.99, 1.01, size=1)[0]
+    def search2call_hero_info(self, input_targets, input_obj_type, input_obj_ids):
+        """
+        通用函数，根据给出的信息和范围查找对应目标
+        :param input_targets: 技能或效果的目标式神
+        :param input_obj_type: 查找的信息类型
+        :param input_obj_ids: 查找的对象id
+        :return:
+        """
+        # 调整参数的数据类型
+        if type(input_targets) is not list:
+            input_targets = [input_targets]
+        if type(input_obj_ids) is int:
+            input_obj_ids = [input_obj_ids]
 
-    def make_damage(self, targets, coefficient, category, kind, trigger_item_or_skill, trigger_range, factor=None):
+        # 查找对应的式神信息
+        if input_obj_type == 'hero_id':
+            for hero in input_targets:
+                if hero.id in input_obj_ids:
+                    return hero, hero.id  # 如果找到对应式神，返回该式神
+            return 0, None
+        elif input_obj_type == 'item_id':
+            for hero in input_targets:
+                if hero.item.id in input_obj_ids:
+                    item_value = hero.item.call(self, hero)
+                    return item_value, hero.item.id  # 如果找到对应御魂，触发御魂效果，返回数值
+            return 0, None
+        elif input_obj_type == 'state_id':
+            for hero in input_targets:
+                states = [state.id for state in hero.states]
+                intersection_sates = list(set(states) & set(input_obj_ids))
+                if intersection_sates:
+                    return 1, intersection_sates  # 如果找到对应状态， 返回1 否则返回0
+            return 0, None
+
+    def compute_damage_a(self, in_hero_attack, in_target_defense, in_coefficient, in_hero_damage_state_multiply,
+                         in_target_damage_state_multiply, in_independent_damage_multiply):
+        damage_a = (in_hero_attack * in_coefficient * (300 / (300 + in_target_defense)) * in_hero_damage_state_multiply
+                    * in_target_damage_state_multiply * in_independent_damage_multiply)
+        return damage_a
+
+    def crit_check(self, target):  # 暴击判定函数
+        self_crit = self.get_current_attribution('crit')
+        target_crit_resistance = target.get_current_attribution('crit_resistance')
+        if np.random.rand() < self_crit - target_crit_resistance:
+            return True
+        else:
+            return False
+
+    def damage_share(self, in_target, in_target_team, in_damage, in_hero_pool):
+        if in_damage.value > 0:
+            # 锁定分担目标
+            if search_hero_info(in_target, 'state_id', '孤立'):  # 如果有孤立状态，不进行伤害分担
+                return 0, 0
+            else:
+                if self.search2call_hero_info(in_target, 'state_id', '小白守护'): # 小白守护状态
+                    shared_damage = Effect(self, in_target, in_damage.value, 1, 0)
+                    in_damage.value = 0
+                    shared_damage.call(in_hero_pool) # 小白守护状态结算
+                    return 0, shared_damage
+                elif self.search2call_hero_info(in_target, 'state_id', '椒图'):  # 椒图状态
+                    for target in in_target_team.characters:
+                        share_num = 0
+                        share_character_ids = []
+                        if search_hero_info(target, 'state_id', '椒图') and target.id != in_target.id:
+                            share_num += 1
+                            share_character_ids.append(target.id)
+                    if share_num > 0:
+                        in_damage.value = in_damage.value / share_num
+                        shared_damage = Effect(self, share_character_ids, in_damage.value, 1, 3)
+                        return in_damage, shared_damage
+                else:  # 没有椒图状态时才检测剃魂状态
+                    for target in in_target_team.characters:
+                        if target.id != in_target.id:
+                            item_check = search_hero_info(target, 'itemid', '剃魂')  # 如果有剃魂状态
+                            if item_check:
+                                shared_value = in_damage.value * 0.8 * 0.5
+                                in_damage.value = shared_value
+                                shared_damage = Effect(self, target.id, shared_value, 1, 0)
+                            return in_damage, shared_damage
+        return 0, 0
+
+    def receive_damage_trigger(self):
+
+
+    def make_damage(self, targets, coefficient, category, kind, trigger_item, trigger_range, skill_type, factor=None):
         """
 
         :param targets: 目标
         :param coefficient: 伤害系数
         :param category: 伤害类型：0普通， 1间接， 2真实
         :param kind: 攻击类型： 0单体， 1群体
-        :param trigger_item_or_skill: 是否触发御魂或技能， 0不触发， 1触发
+        :param trigger_item: 是否触发御魂， 0不触发， 1触发
         :param trigger_range: 触发范围： 0仅对自己生效， 1仅对目标生效， 2仅对敌方所有生效， 3仅对己方所有生效，4对双方所有生效
+        :param skill_type: 技能类型： 0普通攻击， 1主动， 2被动
         :param factor: 伤害浮动系数
         """
         # 提取需要的状态值
         for target in targets:  # 需要补充的状态值，
-            self_attack_state_plus = state_check(self, 10)  # 攻击增减绝对值
-            self_attack_state_multiply = state_check(self, 0)  # 攻击增减%，累加后计算，如星，缘，鬼吞buff
-            target_defense_state_plus = state_check(target, 12)  # 防御增减绝对值
-            target_defense_state_multiply = state_check(target, 2)  # 防御增减%
             self_damage_state_multiply = state_check(self, 8)  # 造成伤害增减%
             target_hurt_state_multiply = state_check(target, 9)  # 受到伤害增减%
             self_damage_state_plus = state_check(self, 18)  # 造成伤害增减绝对值
-            target_damage_state_plus = state_check(target, 19)  # 受到伤害增减绝对值
             self_independent_damage_multiply = state_check(self, 21)  # 独立增伤伤害%  # 独立增伤，如吸血姬，次林被动，鸣屋
-            self_damage_multiply = state_check(self, 22)  # 伤害放大%， 如破势等造成伤害后生效御魂，食灵buff
+            self_damage_multiply = state_check(self, 22)  # 伤害放大%， 如食灵buff
             target_A_damage_reduction_state_multiply = state_check(target, 23)  # A类减伤%，独立乘算减伤
             target_B_damage_reduction_state_multiply = state_check(target, 24)  # B类减伤%，如触发免死，免死后计算的独立乘算减伤
-            final_self_attack = (self.attack + self_attack_state_plus) * self_attack_state_multiply
-            final_target_defense = max(target.defense + target_defense_state_plus, 0) * target_defense_state_multiply
-
+            final_self_attack = self.get_current_attribution(in_attribution_name='attack')
+            final_target_defense = self.get_current_attribution(in_attribution_name='defense', input_hero=target)
 
             # 伤害计算
             if category == 0:  # 直接伤害
                 # 计算伤害A
-                damage_value = (final_self_attack * coefficient * (300 / (300 + final_target_defense)) *
-                                self_damage_state_multiply * target_hurt_state_multiply * self_independent_damage_multiply *
-                                self.random_factor() + self_damage_state_plus + target_damage_state_plus)
-                # 考虑暴击的伤害数值
-                if possibility(self.crit):
-                    damage_a_value = damage_value * self.crit_damage
-                else:
-                    damage_a_value = damage_value
+                damage_value = self.compute_damage_a(final_self_attack, final_target_defense, coefficient,
+                                                 self_damage_state_multiply, target_hurt_state_multiply,
+                                                 self_independent_damage_multiply)
+                damage = Effect(self, target, damage_value, 1, 0)
+
+                # 考虑暴击
+                if self.crit_check(target):
+                    damage.value = damage.value * self.get_current_attribution(in_attribution_name='crit_damage')
+                    damage.damage_type = 1
+
+                # 考虑伤害波动
+                damage.value = damage.value * np.random.uniform(0.99, 1.01, size=1)[0]
+
 
                 # 计算护盾,得到伤害B
-                damage_b_value = max(damage_a_value - target.shield - target.rot_blood * 3, 0)
+                damage_b_multiply, _ = self.search2call_hero_info(target, 'item_ids', '')
+                if damage_b_multiply == 0:  # 如果没找到加成御魂，伤害乘数为1
+                    damage_b_multiply = 1
+                damage.value = max(damage.value - target.shield - target.rot_blood * 3, 0) * self_damage_multiply * damage_b_multiply
 
                 # 计算分担伤害
-                if damage_b_value > 0:
-                    # 计算造成伤害时增伤效果
-                    damage_b_value = damage_b_value * self_damage_multiply
-
-                    # 锁定分担目标
-                    if search_hero_info(target, 'state_id', '孤立'):  # 如果有孤立状态
-                        pass
-                    else:  # 分担伤害未完成
-                        if search_hero_info(self, 'state_id', '椒图'):  # 椒图状态
-                            share_num = len('椒图_count')
-                            damage_b_value = damage_b_value / share_num
-                            shared_characters = []
-                        elif search_hero_info(target, 'state_id', '剃魂'):  # 如果有剃魂状态
-                            damage_b_value = damage_b_value * 0.8 * 0.5
-                            shared_characters = []
+                damage, shared_damage = self.damage_share(target, target_team, damage, hero_pool)
 
                 # 计算白藏主结界减伤
-                if search_hero_info(self, 'state_id', '白藏主结界')  # 如果有白藏主结界状态
-                    damage_b_value = damage_b_value * 0.5
+                check_result, _ = self.search2call_hero_info(target, 'state_ids', '')  # 如果有白藏主结界状态
+                if check_result:
+                    if damage:
+                        damage.value = damage.value * 0.6
+                    if shared_damage:
+                        shared_damage.value = shared_damage.value * 0.6
 
-                # 计算收到伤害时效果（如：地藏，镜姬）
-                if search_hero_info(self, 'state_id', '地藏镜姬'):  # 补充触发信息
-                    pass
+                # 计算受到伤害时效果（如：地藏，镜姬）
+
+                item_effect_value, item_id = self.search2call_hero_info(target, 'item_ids', '地藏镜姬')  # 补充触发信息
 
                 # 分担伤害结算
-                for character in shared_characters:
+                for id in shared_object_ids:
                     character.health = max(character.health - damage_b_value, 0)
                     if character.health == 0:
                         character.death()
@@ -151,26 +275,35 @@ class Character:
                 # 计算A类减伤（buff栏的受到伤害减伤，独立乘算）
                 damage_c_value = damage_b_value * target_A_damage_reduction_state_multiply
 
+                # 熏记录伤害
+
                 # 免死效果结算
                 if death_check():
                     escape_death()
 
                 # 计算B类减伤
-                damage_d_value = damage_c_value * target_B_damage_reduction_state_multiply
+                # damage_d_value = damage_c_value * target_B_damage_reduction_state_multiply
 
                 # 扣除生命
                 target.health = max(target.health - damage_d_value, 0)
 
                 # 结算日和坊能量收集，海忍守护反击，鬼童丸锁链，SP雪女冰冻
-
+                if search_hero_info(self, 'state_id', 'XXX')  # 如果有结算需求
+                    damage_b_value = damage_b_value * 0.5
 
                 # 死亡判定，死亡单位御魂，被动失效
-
-                # 结算死亡效果
+                if death_check():
+                    # 结算死亡效果（伤魂鸟、御怨般若面具、跳跳哥哥反击等
+                    if search_hero_info(self, 'state_id', 'XXX')  # 如果有结算需求
+                        damage_b_value = damage_b_value * 0.5
 
                 # 结算狰的反击
+                if search_hero_info(self, 'state_id', 'XXX')  # 如果有结算需求
+                    damage_b_value = damage_b_value * 0.5
 
                 # 结算犬神万年竹反击，木魅，日女，返魂香是否触发，御灵是否触发
+                if search_hero_info(self, 'state_id', 'XXX')  # 如果有结算需求
+                    damage_b_value = damage_b_value * 0.5
 
 
 

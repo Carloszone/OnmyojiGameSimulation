@@ -22,6 +22,17 @@ class Env:
     def reset(self):
         pass
 
+    def round(self):
+        # 真回合 推动鬼火条
+        # 新回合 不推动鬼火条
+        # 伪回合 不推动鬼火条 下一个行动单位到达行动条底端
+        # 回合效果检查与结算
+            # 选择技能
+            # 选择目标
+            # 结算技能
+        # 检查是否回复鬼火
+       pass
+
     def get_single_attribution_from_pool(self, in_attribution_name, standard='min'):
         sored_attributions = sorted([(getattr(character, in_attribution_name), character) for character in self.character_pool])
         if standard == 'min':
@@ -30,42 +41,6 @@ class Env:
             return sored_attributions[-1]
         else:
             raise ValueError('No such standard!')
-
-    def damage_process(self):
-        # 计算伤害A
-
-        # 计算护盾
-
-        # 计算伤害B
-
-        # 计算造成伤害时效果
-
-        # 锁定分担目标
-
-        # 计算分担伤害
-
-        # 得到伤害B1
-
-        # 计算伤害B2
-
-        # 伤害B2修正
-
-        # 扣除生命
-        pass
-
-    # 行动条计算
-
-    # 能量条计算
-
-    # 回合模拟
-    def round(self, in_action_hero, in_round_code):
-        """
-
-        :param in_action_hero: 行动的式神
-        :param in_round_code: 回合代码， 0普通回合， 1新回合，2伪回合
-        :return:
-        """
-        pass
 
     def step(self):
         # 1. 游戏开始时
