@@ -17,6 +17,7 @@ class Character:
         damage = self.attack - target.defense
         target.health -= damage
         print(f'{self.name} attacks {target.name}, dealing {damage} damage!')
+        print(f'{target.name} has {target.health} health left!')
 
 class env:
     def __init__(self, player_1, player_2):
@@ -35,18 +36,20 @@ class env:
         return 1
 
     def step(self):
-        round = 0
+        round_count = 0
         while self.death_check():
-            round += 1
+            round_count += 1
+            print(f'***Round {round_count} starts!***')
             play_list = [self.player_1, self.player_2]
 
-            if round % 2:
+            if round_count % 2:
                 action_player = self.player_1
                 target_player = self.player_2
             else:
                 action_player = self.player_2
                 target_player = self.player_1
             action_player.make_damage(target_player)
+            print('\n')
 
 
 if __name__ == '__main__':
