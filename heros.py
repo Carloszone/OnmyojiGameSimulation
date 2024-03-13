@@ -1,7 +1,8 @@
 import numpy as np
 
 class Character:
-    def __init__(self, name, health, mana, attack, defense, speed):
+    def __init__(self, hero_id, name, health, mana, attack, defense, speed, max_health=None, max_mana=None):
+        self.id = hero_id
         self.name = name
         self.health = health
         self.mana = mana
@@ -10,24 +11,34 @@ class Character:
         self.speed = speed
         self.current_location = 0
 
+        # limitation
+        if max_health is None:
+            self.max_health = health
+        else:
+            self.max_health = max_health
+        if max_mana is None:
+            self.max_mana = mana
+        else:
+            self.max_mana = max_mana
+
     def details(self):
         print(f"{self.name}'s Attributions:")
         for attr_name in vars(self):
             attr_value = getattr(self, attr_name)
             print(f'{attr_name}: {attr_value}')
 
-    def skill_1(self, target, coefficient=1):
+    def skill_1(self, target, cost, coefficient=1):
         skill_name = 'skill_1'
         damage = self.attack * coefficient - target.defense
         target.health -= damage
         print(f'{self.name} uses {skill_name} to attack {target.name}, dealing {damage} damage!')
         print(f'{target.name} has {target.health} health left!')
 
-    def skill_2(self, target, coefficient=1):
+    def skill_2(self, target, cost, coefficient=1):
         # s powerful attack
         pass
 
-    def skill_3(self, target, coefficient=1):
+    def skill_3(self, target, cost, coefficient=1):
         # ultra skill with special effect
         pass
 
@@ -40,7 +51,7 @@ class Character:
             self.skill_2(target)
 
 
-class env:
+class Env:
     def __init__(self, player_1, player_2):
         self.player_1 = player_1
         self.player_2 = player_2
@@ -85,37 +96,66 @@ class env:
 
 if __name__ == '__main__':
     class Batman(Character):
-        def skill_1(self, target, coefficient=1.25):
+        def skill_1(self, target, cost=0, coefficient=1.4):
+            # name
             skill_name = 'bat_punch'
+
+            # effect
             damage = self.attack * coefficient - target.defense
             target.health -= damage
             print(f'{self.name} uses {skill_name} to attack {target.name}, dealing {damage} damage!')
             print(f'{target.name} has {target.health} health left!')
-            self.mana += 1
+            self.mana = min(self.max_mana, self.mana + 1)
 
-        def skill_2(self, target, coefficient=3):
-            skill_name = 'bat_kick'
-            damage = self.attack * coefficient - target.defense
-            target.health -= damage
-            print(f'{self.name} uses {skill_name} to attack {target.name}, dealing {damage} damage!')
-            print(f'{target.name} has {target.health} health left!')
-            self.mana -= 2
+            # cost
+            self.mana -= cost
 
-        def skill_3(self, target, coefficient=2):
-            skill_name = 'bat_nature'
-            self.defense = self.defense * coefficient
+        def skill_2(self, target, cost=2, coefficient=2):
+            skill_name = 'bat_rage'
+
+            # effect
+            self.defense = self.defense / coefficient
             self.attack = self.attack * coefficient
-            self.speed = self.speed * coefficient
+            # self.speed = self.speed * coefficient
             print(f'{self.name} uses {skill_name} to enhance himself!')
             print(f"{self.name}'s defense from {self.defense / coefficient} to {self.defense} !")
             print(f"{self.name}'s attack from {self.attack / coefficient} to {self.attack} !")
-            print(f"{self.name}'s speed from {self.speed / coefficient} to {self.speed} !")
-            self.mana -= 3
+            # print(f"{self.name}'s speed from {self.speed / coefficient} to {self.speed} !")
+
+            # cost
+            self.mana -= cost
+
+        def skill_3(self, target, cost=5, coefficient=2):
+            # name
+            skill_name = 'bat_nature'
+
+            # effect
+            self.health = min(self.max_health, self.health + self.max_health / coefficient)
+            print(f'{self.name} uses {skill_name} to recover health! now {self.name} has {self.health} health left!')
+
+            damage = self.attack * coefficient - target.defense
+            target.health -= damage
+            print(f'{self.name} uses {skill_name} to attack {target.name}, dealing {damage} damage!')
+            print(f'{target.name} has {target.health} health left!')
+
+            # cost
+            self.mana -= cost
+
+        def choose_skill(self, target):
+            if (self.health <= self.max_health / 2) and (self.mana >= 3):
+                self.skill_3(target)
+            elif (self.health >= self.max_health /2) and (self.mana >=2):
+                self.skill_2(target)
+            else:
+                self.skill_1(target)
 
 
     class Joker(Character):
-        def skill_1(self, target, coefficient=0.7):
+        def skill_1(self, target, cost=0, coefficient=0.7):
+            # name
             skill_name = "joker's trick"
+
+            # effect
             for i in range(2):
                 damage = self.attack * coefficient - target.defense
                 target.health -= damage
@@ -123,32 +163,45 @@ if __name__ == '__main__':
                 print(f'{target.name} has {target.health} health left!')
             self.mana += 1
 
-        def skill_2(self, target, coefficient=1.5):
-            skill_name = "joker's laugh"
+            # cost
+            self.mana -= cost
+
+        def skill_2(self, target, cost=0, coefficient=1.5):
+            # name
+            skill_name = "joker's smile"
+
+            # effect
+            self.speed = self.speed * coefficient
+            print(f'{self.name} uses {skill_name} to slow his speed! now the speed is {self.speed}')
+            self.mana += min(self.mana+2, self.max_mana)
+            print(f'{self.name} uses {skill_name} to gain 2 mana')
+
+            # cost
+            self.mana -= cost
+
+        def skill_3(self, target, cost=3, coefficient=4):
+            # name
+            skill_name = "joker's shadow"
+
+            # effect
             damage = self.attack * coefficient - target.defense
             target.health -= damage
             print(f'{self.name} uses {skill_name} to attack {target.name}, dealing {damage} damage!')
             print(f'{target.name} has {target.health} health left!')
 
-            self.mana += 1
-            print(f'{self.name} uses {skill_name} to gain an additional mana! Now he has {self.mana} mana!')
-            self.mana -= 2
+            # cost
+            self.mana -= cost
 
-        def skill_3(self, target, coefficient=0.5):
-            skill_name = "joker's shadow"
-            # self.defense = self.defense * coefficient
-            # self.speed = self.speed * coefficient
-            self.attack = self.attack / coefficient
-            self.health = self.health / coefficient
-            print(f'{self.name} uses {skill_name} to enhance himself!')
-            # print(f"{self.name}'s defense from {self.defense / coefficient} to {self.defense} !")
-            # print(f"{self.name}'s speed from {self.speed / coefficient} to {self.speed} !")
-            print(f"{self.name}'s attack from {self.attack * coefficient} to {self.attack} !")
-            print(f"{self.name}'s health from {self.health * coefficient} to {self.health} !")
-            self.mana -= 3
+        def choose_skill(self, target):
+            if self.mana >= 3:
+                self.skill_3(target)
+            elif self.mana == 0:
+                self.skill_2(target)
+            else:
+                self.skill_1(target)
 
-    hero_1 = Joker('Joker', 1000, 3, 100, 50, 150)
-    hero_2 = Batman('batman', 800, 3, 150, 50, 200)
+    hero_1 = Joker('1', 'Joker', 1000, 3, 100, 50, 150)
+    hero_2 = Batman('2', 'batman', 800, 3, 150, 50, 200)
 
-    game = env(hero_1, hero_2)
+    game = Env(hero_1, hero_2)
     game.step()
