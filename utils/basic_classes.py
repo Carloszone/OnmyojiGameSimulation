@@ -1,6 +1,10 @@
 from typing import Optional, Union
 from abc import ABC, abstractmethod
-
+from collections import defaultdict
+import logging
+import os
+import time
+import numpy as np
 
 class State(ABC):
     """
@@ -78,26 +82,25 @@ class Spirit(ABC):
     """
     御魂效果的抽象类，部分御魂效果的实现实质上是为式神添加对应的状态，因此初始化时需要传入状态相关的参数
     name：str，御魂的名称
-    duration：int，御魂效果的持续时间
-    attribute：str，御魂效果作用的属性
-    value：int or float，御魂效果作用的数值
+    trigger_moment: list[int]，御魂效果的触发时机
     """
 
     def __init__(self, name: str,
-                 activate: bool = True,
-                 duration: Optional[int] = None,
-                 attribute: Optional[str] = None,
-                 value: Union[int, float, None] = None):
+                 trigger_moment: Optional[list[int]] = None):
         self.name = name
-        self.activate = activate
-        self.duration = duration
-        self.attribute = attribute
-        self.value = value
+        self.trigger_moment = trigger_moment
 
     @abstractmethod
     def __call__(self, *args, **kwargs):
         """
         结算御魂效果的抽象类
+        """
+        pass
+
+    @abstractmethod
+    def subscribe(self, *args, **kwargs):
+        """
+        订阅事件触发器
         """
         pass
 
@@ -499,4 +502,104 @@ class Game:
 
     @abstractmethod
     def end(self):
+        pass
+
+
+class EventManger:
+    def __init__(self):
+        self.agents = defaultdict(list)
+        self.logger = logger()
+
+    def register(self, event_type, agent):
+        if agent not in self.agents[event_type]:
+            self.agents[event_type].append(agent)
+
+    def unregister(self, event_type, agent):
+        if event_type in self.agents and agent in self.agents[event_type]:
+            self.agents[event_type].remove(agent)
+
+            # 如果注销后的事件列表为0，删除该事件类型
+            if not self.agents[event_type]:
+                del self.agents[event_type]
+
+    def trigger(self, event_data: dict):
+        event_type = event_data.get('event_type')
+        if event_type in self.agents:
+            trigger_line = list(self.agents[event_type])
+            for agent in trigger_line:
+                trigger_output = agent(event_data)
+                self.logger.log(event_data, trigger_output)
+
+
+class ActionManger:
+    def __init__(self, bar_len=1000, epsilon=1e-6):
+        self.roles = []
+        self.action_line = []  # {'role': Character, 'type': int, default_action: dict/None}
+        self.action_bar_length = bar_len
+        self.epsilon = epsilon
+
+    def reset(self):
+        self.roles = []
+        self.action_line = []
+
+    def add_role(self, role:Character):
+        self.roles.append(role)
+
+    def remove_role(self, role: Character):
+        self.roles.remove(role)
+
+    def update_location(self, roles: list, values: list):
+        # 更新角色的行动条信息
+        for role, value in zip(roles, values):
+            real_value = max(self.action_bar_length, min(value, 0))
+            role.location = real_value
+
+        # 计算到达终点的角色信息
+        candidate_flags = [np.abs(role.location - self.action_bar_length) < self.epsilon
+                           for role in self.roles]
+        candidates = [self.roles[index] for index, flag in enumerate(candidate_flags) if flag]
+        candidates.sort(key=lambda x: x.get_current_tribution('speed'), reverse=True)
+        sorted_candidates = [{'role': candidate, 'type': 0, 'default_action': None} for candidate in candidates]
+        if self.action_line:
+            self.action_line += sorted_candidates
+        else:
+            self.action_line = sorted_candidates
+
+    def next_action_character(self):
+        if self.action_line:
+            return self.action_line[0]
+        else:
+            # 获取当前所有行动角色的信息
+            current_locations = [role.get_current_atribution('location') for role in self.roles]
+            current_speed = [role.get_current_atribution('speed') for role in self.roles]
+            current_length = [self.action_bar_length * role.get_current_atribution('action_bar_factor')
+                              for role in self.roles]
+
+            # 计算最快到达行动条顶点的事件
+            needed_time = [np.round((length - location) / speed, 10)
+                           for location, speed, length in zip(current_locations, current_speed, current_length)]
+            min_time = np.min(needed_time)
+
+            # 计算下一个角色行动时，各个角色的行动条信息
+            new_locations = [location + speed * min_time for location, speed in zip(current_locations, current_speed)]
+
+            # 更新所有角色的location信息
+            self.update_location(self.roles, new_locations)
+            return self.action_line[0]
+
+
+
+
+
+
+
+
+
+
+
+class logger:
+    def __init__(self):
+        self.logger_method_mapping = {}
+
+    def log(self, event_data, trigger_output):
         pass
